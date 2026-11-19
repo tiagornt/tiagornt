@@ -215,12 +215,29 @@ function Base() {
               onChange={(e) => mudarVista((v) => v.fundo && (v.fundo.opacidade = +e.target.value), false)}
             />
           </label>
+          {!fundo.travado && (
+            <div className="rounded bg-sky-500/10 p-2 text-xs text-sky-200">
+              Fundo destravado: com a seta, arraste num espaço vazio do quadro para posicionar. Trave de novo antes de decalcar.
+            </div>
+          )}
+          {fundo.imagem && (
+            <div className="flex flex-wrap items-center gap-1 text-xs">
+              <span className="text-[var(--fraco)]">Girar</span>
+              {[-90, -1, 1, 90].map((g) => (
+                <button key={g} className="chip px-1.5 text-[11px]" onClick={() => mudarVista((v) => v.fundo?.imagem && (v.fundo.imagem.rotacao = (v.fundo.imagem.rotacao + g) % 360))}>
+                  {g > 0 ? "+" : ""}
+                  {g}°
+                </button>
+              ))}
+              <span className="ml-auto text-[var(--fraco)]">{fundo.imagem.rotacao}°</span>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-1">
             <button className="botao" onClick={() => set({ ferramenta: "calibrar" })} title="Clique em duas pontas e informe a medida real">
               <Ruler size={14} /> Calibrar
             </button>
             {fundo.tipo === "dxf" ? (
-              <button className="botao" onClick={() => set({ ferramenta: "promover" })} title="Clique numa linha do DXF para virar parede">
+              <button className="botao" onClick={() => set({ ferramenta: "promover" })} title="Clique numa linha do DXF para virar parede. Shift + clique: a polilinha inteira.">
                 <Wand2 size={14} /> Promover a parede
               </button>
             ) : (

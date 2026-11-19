@@ -9,7 +9,7 @@ import { rgbDoCCT } from "../cor";
 import type { Camera } from "./camera";
 import { paraTela } from "./camera";
 import { assinaturaSegmentos, desenharLuzes, type ContextoLuz } from "./luz";
-import { bloqueadoresDaVista } from "../geometria";
+import { bloqueadoresDaVista, contornoDasParedes, recuarPoligono } from "../geometria";
 
 export type Tema = "escuro" | "claro";
 
@@ -134,6 +134,16 @@ function camadaDeLuz(
   }
   c.putImageData(img, 0, 0);
   return cv;
+}
+
+const cacheLimite = new WeakMap<object, Pt[] | null>();
+/** Contorno externo das paredes da vista, um pouco afastado (para incluir a espessura das paredes). */
+function contornoDaVista(v: Vista): Pt[] | null {
+  if (cacheLimite.has(v.paredes)) return cacheLimite.get(v.paredes)!;
+  const c = contornoDasParedes(v.paredes);
+  const r = c ? recuarPoligono(c, -0.01) : null;
+  cacheLimite.set(v.paredes, r);
+  return r;
 }
 
 const imagens = new Map<string, HTMLImageElement>();
@@ -308,6 +318,15 @@ export function desenharQuadro(ctx: CanvasRenderingContext2D, o: OpcoesQuadro) {
       if (!o.exportacao) cacheCamada = { fontes: v.fontes, chave, canvas: camada };
     }
     ctx.save();
+    // a luz fica dentro do contorno externo das paredes (não "vaza" pela janela para fora da planta)
+    const lim = contornoDaVista(v);
+    if (lim) {
+      mundo();
+      ctx.beginPath();
+      lim.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+      ctx.closePath();
+      ctx.clip();
+    }
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     if (o.mapa) ctx.globalAlpha = 0.35;
     ctx.globalCompositeOperation = o.soLuzes ? "source-over" : o.tema === "escuro" ? "screen" : "multiply";
@@ -533,8 +552,9 @@ function desenharCotasCorte(ctx: CanvasRenderingContext2D, o: OpcoesQuadro, v: V
   ctx.lineTo(maxX, pl);
   ctx.stroke();
   ctx.restore();
-  texto(ctx, o, { x: maxX + 0.1, y: pl }, `plano ${fmt(pl, 2)} m`, 10, c.textoFraco, "left");
-  texto(ctx, o, { x: maxX + 0.1, y: o.ambiente.peDireito }, `pé-direito ${fmt(o.ambiente.peDireito, 2)} m`, 10, c.textoFraco, "left");
+  const px2 = 1 / o.cam.s;
+  texto(ctx, o, { x: minX + px2 * 8, y: pl + px2 * 3 }, `plano de trabalho ${fmt(pl, 2)} m`, 10, c.textoFraco, "left", "bottom");
+  texto(ctx, o, { x: minX + px2 * 8, y: o.ambiente.peDireito - px2 * 4 }, `pé-direito ${fmt(o.ambiente.peDireito, 2)} m`, 10, c.textoFraco, "left", "top");
 }
 
 function desenharExtrasPlanta(ctx: CanvasRenderingContext2D, o: OpcoesQuadro, px: number) {

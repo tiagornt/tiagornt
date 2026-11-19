@@ -239,58 +239,55 @@ function desenharLinear(ctx: CanvasRenderingContext2D, f: Fonte, c: ContextoLuz)
   const prof = c.vista === "corte" ? 1.4 : dirigido ? profundidadeLinear(f, h, t, meia) : 0.5 + h * 0.4;
   const atras = dirigido ? 0.12 : prof;
   const pedacos = Math.max(1, Math.min(14, Math.ceil(L / 0.35)));
-  const larg = L / pedacos;
 
   const tmp = criarCanvas(ctx.canvas.width, ctx.canvas.height);
   const tctx = tmp.getContext("2d")!;
   tctx.setTransform(ctx.getTransform());
 
+  // Recorte: união dos polígonos de visibilidade de pontos ao longo da linha
+  // (a luz chega onde algum trecho da linha enxerga). Um preenchimento só, sem emendas.
+  tctx.save();
+  tctx.beginPath();
   for (let i = 0; i < pedacos; i++) {
     const s = (i + 0.5) / pedacos - 0.5;
     const o = { x: f.x + dirLinha.x * s * L, y: f.y + dirLinha.y * s * L };
-    tctx.save();
-    // recorte de visibilidade a partir do centro do pedaço
-    const vis = poligonoVisibilidade(o, Math.hypot(larg, prof) + 0.3, c.bloqueadores);
-    tctx.beginPath();
+    const vis = poligonoVisibilidade(o, Math.hypot(L, prof) + 0.4, c.bloqueadores);
     vis.forEach((p, k) => (k ? tctx.lineTo(p.x, p.y) : tctx.moveTo(p.x, p.y)));
     tctx.closePath();
-    tctx.clip();
-    const g = tctx.createLinearGradient(o.x - dirLuz.x * atras, o.y - dirLuz.y * atras, o.x + dirLuz.x * prof, o.y + dirLuz.y * prof);
-    const total = atras + prof;
-    const z = atras / total;
-    if (dirigido) {
-      g.addColorStop(0, "rgba(255,255,255,0)");
-      g.addColorStop(z * 0.5, "rgba(255,255,255,0.35)");
-      g.addColorStop(z, "rgba(255,255,255,1)");
-      g.addColorStop(z + (1 - z) * 0.25, "rgba(255,255,255,0.7)");
-      g.addColorStop(z + (1 - z) * 0.6, "rgba(255,255,255,0.28)");
-      g.addColorStop(1, "rgba(255,255,255,0)");
-    } else {
-      for (let k = 0; k <= 10; k++) {
-        const u = k / 10;
-        const d = Math.abs(u - 0.5) * 2;
-        g.addColorStop(u, `rgba(255,255,255,${(Math.exp(-3.5 * d * d) * (1 - d ** 4)).toFixed(3)})`);
-      }
-    }
-    tctx.fillStyle = g;
-    // retângulo do pedaço, com um pouco de sobreposição
-    const meiaL = larg / 2 + 0.01;
-    tctx.beginPath();
-    const p0 = { x: o.x - dirLinha.x * meiaL - dirLuz.x * atras, y: o.y - dirLinha.y * meiaL - dirLuz.y * atras };
-    const p1 = { x: o.x + dirLinha.x * meiaL - dirLuz.x * atras, y: o.y + dirLinha.y * meiaL - dirLuz.y * atras };
-    const p2 = { x: p1.x + dirLuz.x * total, y: p1.y + dirLuz.y * total };
-    const p3 = { x: p0.x + dirLuz.x * total, y: p0.y + dirLuz.y * total };
-    tctx.moveTo(p0.x, p0.y);
-    tctx.lineTo(p1.x, p1.y);
-    tctx.lineTo(p2.x, p2.y);
-    tctx.lineTo(p3.x, p3.y);
-    tctx.closePath();
-    tctx.fill();
-    tctx.restore();
   }
+  tctx.clip("nonzero");
+  const g = tctx.createLinearGradient(f.x - dirLuz.x * atras, f.y - dirLuz.y * atras, f.x + dirLuz.x * prof, f.y + dirLuz.y * prof);
+  const total = atras + prof;
+  const z = atras / total;
+  if (dirigido) {
+    g.addColorStop(0, "rgba(255,255,255,0)");
+    g.addColorStop(z * 0.5, "rgba(255,255,255,0.35)");
+    g.addColorStop(z, "rgba(255,255,255,1)");
+    g.addColorStop(z + (1 - z) * 0.25, "rgba(255,255,255,0.7)");
+    g.addColorStop(z + (1 - z) * 0.6, "rgba(255,255,255,0.28)");
+    g.addColorStop(1, "rgba(255,255,255,0)");
+  } else {
+    for (let k = 0; k <= 10; k++) {
+      const u = k / 10;
+      const d = Math.abs(u - 0.5) * 2;
+      g.addColorStop(u, `rgba(255,255,255,${(Math.exp(-3.5 * d * d) * (1 - d ** 4)).toFixed(3)})`);
+    }
+  }
+  tctx.fillStyle = g;
+  const ext = Math.min(0.45, L * 0.3) + 0.15;
+  const meiaL = L / 2 + ext;
+  const p0 = { x: f.x - dirLinha.x * meiaL - dirLuz.x * atras, y: f.y - dirLinha.y * meiaL - dirLuz.y * atras };
+  const p1 = { x: f.x + dirLinha.x * meiaL - dirLuz.x * atras, y: f.y + dirLinha.y * meiaL - dirLuz.y * atras };
+  tctx.beginPath();
+  tctx.moveTo(p0.x, p0.y);
+  tctx.lineTo(p1.x, p1.y);
+  tctx.lineTo(p1.x + dirLuz.x * total, p1.y + dirLuz.y * total);
+  tctx.lineTo(p0.x + dirLuz.x * total, p0.y + dirLuz.y * total);
+  tctx.closePath();
+  tctx.fill();
+  tctx.restore();
   // pontas suaves ao longo da linha
   tctx.globalCompositeOperation = "destination-in";
-  const ext = Math.min(0.45, L * 0.3) + 0.15;
   const a0 = { x: f.x - dirLinha.x * (L / 2 + ext), y: f.y - dirLinha.y * (L / 2 + ext) };
   const a1 = { x: f.x + dirLinha.x * (L / 2 + ext), y: f.y + dirLinha.y * (L / 2 + ext) };
   const ge = tctx.createLinearGradient(a0.x, a0.y, a1.x, a1.y);

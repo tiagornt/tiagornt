@@ -34,7 +34,7 @@ export function renderizarQuadro(
   a: Ambiente,
   vista: "planta" | "corte",
   tema: Tema,
-  opcoes: { largura: number; altura: number; soLuzes?: boolean; mapa?: boolean; legenda?: boolean; marca?: boolean; dpr?: number },
+  opcoes: { largura: number; altura: number; soLuzes?: boolean; mapa?: boolean; legenda?: boolean; marca?: boolean; dpr?: number; semEscala?: boolean },
 ): HTMLCanvasElement {
   const v = vista === "planta" ? a.planta : a.corte;
   const W = opcoes.largura;
@@ -73,7 +73,7 @@ export function renderizarQuadro(
     const ly = Math.max(opcoes.marca ? 60 * esc : 12, Math.min(H - 200 * esc, pos.y * H));
     desenharLegenda(ctx, v.fontes, lx, ly, opcoes.soLuzes ? "escuro" : tema, esc);
   }
-  if (opcoes.mapa && a.calculos.p2pH && !opcoes.soLuzes) {
+  if (opcoes.mapa && a.calculos.p2pH && !opcoes.soLuzes && !opcoes.semEscala) {
     desenharEscala(ctx, W - 380 * esc, H - 70 * esc, 300 * esc, tema);
   }
   if (opcoes.marca) desenharMarcaPng(ctx, W, H, a, tema, esc, !!opcoes.mapa);
@@ -355,7 +355,7 @@ function paginaMemorial(doc: jsPDF, p: Projeto, a: Ambiente, W: number, H: numbe
     const pxmm = 300 / 25.4;
     if (a.calculos.p2pH) {
       const mh = 70;
-      const cv = renderizarQuadro(a, "planta", p.temaQuadro, { largura: Math.round(mw * pxmm * 0.5), altura: Math.round(mh * pxmm * 0.5), mapa: true, dpr: 2 });
+      const cv = renderizarQuadro(a, "planta", p.temaQuadro, { largura: Math.round(mw * pxmm * 0.5), altura: Math.round(mh * pxmm * 0.5), mapa: true, dpr: 2, semEscala: true });
       doc.addImage(cv, "PNG", mx, my, mw, mh, undefined, "FAST");
       rotuloImagem(doc, mx, my, "P2P HORIZONTAL");
       my += mh + 2;

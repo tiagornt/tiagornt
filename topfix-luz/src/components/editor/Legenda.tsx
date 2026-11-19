@@ -51,7 +51,7 @@ export function LegendaQuadro() {
   return (
     <div
       ref={ref}
-      className="absolute z-10 cursor-move rounded-lg border border-white/15 bg-[#0d1320]/90 px-3 py-2 text-xs text-[#e7ecf6] shadow-xl backdrop-blur"
+      className="absolute z-10 cursor-move rounded-lg border border-white/15 bg-[#0d1320]/90 px-3 py-2 text-xs text-[#e7ecf6] shadow-xl backdrop-blur max-md:origin-top-left max-md:scale-75"
       style={{ left: `${pos.x * 100}%`, top: `${pos.y * 100}%` }}
       onPointerDown={(e) => {
         const pai = ref.current!.parentElement!.getBoundingClientRect();

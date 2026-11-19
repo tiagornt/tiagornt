@@ -43,9 +43,9 @@ function Btn(props: { ativo?: boolean; titulo: string; onClick: () => void; chil
   );
 }
 
-function Grupo(props: { rotulo: string; children: ReactNode }) {
+function Grupo(props: { rotulo: string; children: ReactNode; soComputador?: boolean }) {
   return (
-    <div className="flex items-center gap-1.5">
+    <div className={`flex items-center gap-1.5 ${props.soComputador ? "max-md:hidden" : ""}`}>
       <span className="hidden text-[10px] font-bold tracking-[0.14em] text-[var(--fraco)] xl:inline">{props.rotulo}</span>
       <div className="flex items-center gap-0.5 rounded-lg bg-black/25 p-0.5">{props.children}</div>
     </div>
@@ -66,7 +66,7 @@ export function BarraFerramentas() {
   const f = (x: Ferramenta) => () => set({ ferramenta: x });
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-[var(--borda)] px-3 py-2">
-      <Grupo rotulo="EDIÇÃO">
+      <Grupo rotulo="EDIÇÃO" soComputador>
         <Btn titulo="Selecionar (V)" ativo={ferramenta === "selecionar"} onClick={f("selecionar")}>
           <MousePointer2 size={17} />
         </Btn>
@@ -86,7 +86,7 @@ export function BarraFerramentas() {
           <Redo2 size={17} />
         </Btn>
       </Grupo>
-      <Grupo rotulo="AMBIENTE">
+      <Grupo rotulo="AMBIENTE" soComputador>
         <Btn titulo="Parede (W): clique ponto a ponto, digite a medida e Enter" ativo={ferramenta === "parede"} onClick={f("parede")}>
           <PenLine size={17} />
         </Btn>
@@ -126,7 +126,7 @@ export function BarraFerramentas() {
           </Btn>
         )}
       </Grupo>
-      <Grupo rotulo="LUZ">
+      <Grupo rotulo="LUZ" soComputador>
         {NATUREZAS.map((n, i) => (
           <Btn key={n} titulo={`${NOME_NATUREZA[n]} (${i + 1})`} ativo={ferramenta === n} onClick={f(n)}>
             <IconeNatureza n={n} tam={17} />
@@ -134,6 +134,9 @@ export function BarraFerramentas() {
         ))}
       </Grupo>
       <Grupo rotulo="VISTA">
+        <Btn titulo="Mover o quadro" ativo={ferramenta === "mao"} onClick={f("mao")}>
+          <Hand size={17} />
+        </Btn>
         <Btn titulo="Afastar" onClick={() => zoomQuadro(1 / 1.25)}>
           <ZoomOut size={17} />
         </Btn>

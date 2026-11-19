@@ -17,7 +17,8 @@ type Arrasto =
   | { tipo: "ponta"; alvo: { tipo: "parede" | "linha" | "cota"; id: string; ponta: "a" | "b" }; original: Pt; base: Vista }
   | { tipo: "rotacao"; id: string }
   | { tipo: "caixa"; inicio: Pt; atual: Pt }
-  | { tipo: "retangulo"; inicio: Pt; atual: Pt };
+  | { tipo: "retangulo"; inicio: Pt; atual: Pt }
+  | { tipo: "fundo"; inicio: Pt; base: Vista };
 
 const NATUREZAS_FERRAMENTA: Natureza[] = ["facho", "linear_dirigido", "linha_difusa", "difusa"];
 const FERRAMENTAS_DOIS_PONTOS: Ferramenta[] = ["limite", "referencia", "cota", "medir", "calibrar", "plano_vertical", "linha_corte"];
@@ -73,6 +74,7 @@ export function Quadro() {
   useEffect(() => {
     const f = (e: Event) => {
       const k = (e as CustomEvent<number>).detail;
+      mexeuNaCamera.current = true;
       const cam = camRef.current;
       const sx = tam.w / 2;
       const sy = tam.h / 2;
@@ -96,10 +98,17 @@ export function Quadro() {
     redesenhar();
   }, [tam.w, tam.h, redesenhar]);
 
+  // o usuário já mexeu na câmera (pan/zoom)? Se não, o quadro se reenquadra quando muda de tamanho.
+  const mexeuNaCamera = useRef(false);
   useEffect(() => {
+    mexeuNaCamera.current = false;
     enquadrarAgora();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pedidoEnquadrar, ambienteId, vistaNome, tam.w > 100 && tam.h > 100]);
+  }, [pedidoEnquadrar, ambienteId, vistaNome]);
+  useEffect(() => {
+    if (!mexeuNaCamera.current) enquadrarAgora();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tam.w, tam.h]);
 
   // limpa o desenho em andamento ao trocar de ferramenta
   useEffect(() => {
@@ -269,11 +278,11 @@ export function Quadro() {
     return melhor;
   }
 
-  function segmentoDxfProximo(p: Pt, v: Vista, tol: number): { a: Pt; b: Pt } | null {
+  function segmentoDxfProximo(p: Pt, v: Vista, tol: number): { a: Pt; b: Pt; ent: { pts: number[]; fechado: boolean } } | null {
     const f = v.fundo;
     if (!f?.entidades) return null;
     const vis = new Set((f.camadas ?? []).filter((c) => c.visivel).map((c) => c.nome));
-    let melhor: { a: Pt; b: Pt; d: number } | null = null;
+    let melhor: { a: Pt; b: Pt; d: number; ent: { pts: number[]; fechado: boolean } } | null = null;
     for (const e of f.entidades) {
       if (!vis.has(e.camada)) continue;
       const q = e.pts;
@@ -284,7 +293,7 @@ export function Quadro() {
         const j = (i + 1) % n;
         const b = { x: q[2 * j], y: q[2 * j + 1] };
         const r = distSegmento(p, a, b);
-        if (r.d < tol && (!melhor || r.d < melhor.d)) melhor = { a, b, d: r.d };
+        if (r.d < tol && (!melhor || r.d < melhor.d)) melhor = { a, b, d: r.d, ent: e };
       }
     }
     return melhor;
@@ -521,6 +530,12 @@ export function Quadro() {
           est.set({ selecao: sel });
           arrasto.current = { tipo: "mover", inicio: pm, itens: sel, base: vista, moveu: false };
         } else {
+          if (vista.fundo && !vista.fundo.travado && vista.fundo.visivel && !e.shiftKey) {
+            useEditor.getState().marcarHistorico();
+            est.set({ selecao: [] });
+            arrasto.current = { tipo: "fundo", inicio: pm, base: vista };
+            return;
+          }
           if (!e.shiftKey) est.set({ selecao: [] });
           arrasto.current = { tipo: "caixa", inicio: pm, atual: pm };
         }
@@ -582,8 +597,20 @@ export function Quadro() {
           return;
         }
         mudarVista((v) => {
-          v.paredes.push({ id: uid("par_"), a: s.a, b: s.b, espessura: 0.15, lado: "centro", bloqueia: true });
+          if (e.shiftKey) {
+            // polilinha inteira vira paredes
+            const q = s.ent.pts;
+            const n = q.length / 2;
+            const total = s.ent.fechado ? n : n - 1;
+            for (let i = 0; i < total; i++) {
+              const j = (i + 1) % n;
+              const a = { x: q[2 * i], y: q[2 * i + 1] };
+              const b = { x: q[2 * j], y: q[2 * j + 1] };
+              if (dist(a, b) > 0.02) v.paredes.push({ id: uid("par_"), a, b, espessura: 0.15, lado: "centro", bloqueia: true });
+            }
+          } else v.paredes.push({ id: uid("par_"), a: s.a, b: s.b, espessura: 0.15, lado: "centro", bloqueia: true });
         });
+        orientarParedesParaFora();
         return;
       }
       case "plano_vertical": {
@@ -628,6 +655,7 @@ export function Quadro() {
       const cy = (p1.y + p2.y) / 2;
       const c0 = pinca.current.cam;
       const k = d / pinca.current.d;
+      mexeuNaCamera.current = true;
       const s = Math.max(5, Math.min(2000, c0.s * k));
       const w = paraMundo(c0, pinca.current.cx, pinca.current.cy);
       camRef.current = { s, ox: cx - w.x * s, oy: cy + w.y * s };
@@ -646,6 +674,7 @@ export function Quadro() {
       return;
     }
     if (ar.tipo === "pan") {
+      mexeuNaCamera.current = true;
       camRef.current = { ...ar.cam, ox: ar.cam.ox + (sx - ar.x), oy: ar.cam.oy + (sy - ar.y) };
       redesenhar();
       return;
@@ -654,6 +683,22 @@ export function Quadro() {
       ar.atual = ar.tipo === "retangulo" ? aplicarSnap(pm).p : pm;
       setCursor(ar.atual);
       redesenhar();
+      return;
+    }
+    if (ar.tipo === "fundo") {
+      const d = sub(pm, ar.inicio);
+      const fb = ar.base.fundo;
+      if (!fb) return;
+      mudarVista((v) => {
+        if (!v.fundo) return;
+        if (v.fundo.imagem && fb.imagem) {
+          v.fundo.imagem.x = fb.imagem.x + d.x;
+          v.fundo.imagem.y = fb.imagem.y + d.y;
+        }
+        if (v.fundo.entidades && fb.entidades) {
+          v.fundo.entidades = fb.entidades.map((en) => ({ ...en, pts: en.pts.map((val, i) => val + (i % 2 === 0 ? d.x : d.y)) }));
+        }
+      }, false);
       return;
     }
     if (ar.tipo === "rotacao") {
@@ -799,6 +844,7 @@ export function Quadro() {
   }
 
   function aoRolar(e: React.WheelEvent) {
+    mexeuNaCamera.current = true;
     const { sx, sy } = pontoDoEvento(e);
     const cam = camRef.current;
     const k = Math.exp(-e.deltaY * 0.0015);

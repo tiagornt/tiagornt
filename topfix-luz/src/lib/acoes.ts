@@ -305,13 +305,18 @@ export function trazerFontesParaCorte(faixa = 1.5) {
       if (r.d > faixa) continue;
       const x = dot(sub({ x: f.x, y: f.y }, lc.a), u) - t0;
       if (x < -0.05 || x > W + 0.05) continue;
+      // linear: no corte aparece só a parte do comprimento que corre ao longo da linha de corte
+      const linear = f.natureza === "linear_dirigido" || f.natureza === "linha_difusa";
+      const dirLinhaPlanta = dirDeg(f.rotacao + 90);
+      const compCorte = linear ? Math.max(0.15, Math.abs(dot(dirLinhaPlanta, u)) * f.comprimento) : f.comprimento;
       am.corte.fontes.push({
         ...f,
         id: uid("fnt_"),
         x,
         y: f.altura,
+        comprimento: compCorte,
         // no corte, x = direção da linha: o facho inclinado gira para o lado em que aponta na planta
-        rotacao: f.natureza === "facho" ? -90 + (f.tilt || 0) * (dot(dirDeg(f.rotacao), u) >= 0 ? 1 : -1) : -90,
+        rotacao: f.natureza === "facho" || f.natureza === "linear_dirigido" ? -90 + (f.tilt || 0) * (dot(dirDeg(f.rotacao), u) >= 0 ? 1 : -1) : -90,
       });
       n++;
     }

@@ -236,7 +236,7 @@ function BarraStatus() {
     cota: "Clique em duas pontas.",
     medir: "Clique em duas pontas para medir.",
     calibrar: "Clique nas duas pontas de uma medida conhecida do fundo.",
-    promover: "Clique numa linha do DXF para transformá-la em parede.",
+    promover: "Clique numa linha do DXF para transformá-la em parede. Shift + clique transforma a polilinha inteira.",
     plano_vertical: "Clique numa parede, ou em duas pontas para desenhar o plano.",
     linha_corte: "Clique em duas pontas. O corte olha para a esquerda da linha (de A para A).",
     facho: "Clique para colocar. Selecione e arraste a alça azul para girar.",

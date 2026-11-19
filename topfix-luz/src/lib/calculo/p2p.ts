@@ -25,6 +25,9 @@ export interface Conversao {
   texto: string;
 }
 
+/** Número com vírgula decimal, para o memorial. */
+const br = (n: number, casas: number) => n.toLocaleString("pt-BR", { minimumFractionDigits: casas, maximumFractionDigits: casas });
+
 const normaliza = (v: V3): V3 => {
   const l = Math.hypot(v.x, v.y, v.z) || 1;
   return { x: v.x / l, y: v.y / l, z: v.z / l };
@@ -66,16 +69,16 @@ export function emissoresDasFontes(fontes: Fonte[]): {
     let texto: string;
     if (temI) {
       I0total = f.intensidadeCd!;
-      texto = `I0 = ${I0total.toFixed(0)} cd (informado)`;
+      texto = `I0 = ${br(I0total, 0)} cd (informado)`;
     } else if (difusa) {
       I0total = f.fluxo! / Math.PI;
-      texto = `I0 = Φ / π = ${f.fluxo!.toFixed(0)} / π = ${I0total.toFixed(1)} cd (lambertiana simples)`;
+      texto = `I0 = Φ / π = ${br(f.fluxo!, 0)} / π = ${br(I0total, 1)} cd (lambertiana simples)`;
     } else {
       const om = anguloSolido(meia);
       I0total = f.fluxo! / om;
-      texto = `I0 = Φ / Ω, Ω = 2π(1 - cos ${(f.abertura / 2).toFixed(1)}°) = ${om.toFixed(3)} sr, I0 = ${I0total.toFixed(1)} cd`;
+      texto = `I0 = Φ / Ω, Ω = 2π(1 - cos ${br(f.abertura / 2, 1)}°) = ${br(om, 3)} sr, I0 = ${br(I0total, 1)} cd`;
     }
-    if (linear) texto += `; linear discretizada de ${PASSO_LINEAR.toFixed(2).replace(".", ",")} m (${n} pontos de ${(I0total / n).toFixed(1)} cd)`;
+    if (linear) texto += `; linear discretizada de ${br(PASSO_LINEAR, 2)} m (${n} pontos de ${br(I0total / n, 1)} cd)`;
     const chave = `${f.codigo}|${texto}`;
     if (!vistos.has(chave)) {
       vistos.add(chave);
