@@ -65,6 +65,75 @@ export interface OpcoesQuadro {
   marcadores?: boolean;
   /** Planta: mostra o plano vertical escolhido e a linha de corte. */
   extrasPlanta?: boolean;
+  /** Desenho para exportação (não usa nem grava o cache da tela). */
+  exportacao?: boolean;
+}
+
+let cacheCamada: { fontes: unknown; chave: string; canvas: HTMLCanvasElement } | null = null;
+
+/** Ganho por fonte na soma (deixa folga antes de saturar os 8 bits). */
+const GANHO = 0.3;
+/** Teto de brilho e curva: uma fonte sozinha chega a ~66%, várias somadas se aproximam de 92% sem estourar. */
+const TETO = 0.92;
+const CURVA = 1.25;
+const LUT = (() => {
+  const t = new Float32Array(256);
+  for (let m = 1; m < 256; m++) {
+    const x = m / 255 / GANHO;
+    t[m] = TETO * (1 - Math.exp(-CURVA * x));
+  }
+  return t;
+})();
+
+/**
+ * Soma as manchas sobre preto e aplica o teto de brilho preservando a cor.
+ * modo "tela": RGB opaco (para "screen" sobre o fundo escuro);
+ * modo "alfa": cor normalizada e transparência = brilho (PNG de luzes e quadro claro).
+ */
+function camadaDeLuz(
+  fontes: Fonte[],
+  cl: ContextoLuz,
+  cam: Camera,
+  Wcss: number,
+  Hcss: number,
+  tema: Tema,
+  k: number,
+  modo: "tela" | "alfa",
+): HTMLCanvasElement {
+  const cv = document.createElement("canvas");
+  cv.width = Math.max(1, Math.ceil(Wcss * k));
+  cv.height = Math.max(1, Math.ceil(Hcss * k));
+  const c = cv.getContext("2d", { willReadFrequently: true })!;
+  c.fillStyle = "#000";
+  c.fillRect(0, 0, cv.width, cv.height);
+  desenharLuzes(c, fontes, cl, cam, tema, k, GANHO);
+  const img = c.getImageData(0, 0, cv.width, cv.height);
+  const d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const r = d[i];
+    const g = d[i + 1];
+    const b = d[i + 2];
+    const mx = r > g ? (r > b ? r : b) : g > b ? g : b;
+    if (mx === 0) {
+      if (modo === "alfa") d[i + 3] = 0;
+      continue;
+    }
+    const y = LUT[mx];
+    if (modo === "tela") {
+      const s = (y * 255) / mx;
+      d[i] = r * s;
+      d[i + 1] = g * s;
+      d[i + 2] = b * s;
+    } else {
+      const s = 255 / mx;
+      d[i] = r * s;
+      d[i + 1] = g * s;
+      d[i + 2] = b * s;
+      d[i + 3] = y * 255;
+    }
+  }
+  c.putImageData(img, 0, 0);
+  return cv;
 }
 
 const imagens = new Map<string, HTMLImageElement>();
@@ -228,27 +297,24 @@ export function desenharQuadro(ctx: CanvasRenderingContext2D, o: OpcoesQuadro) {
       bloqueadores: bloq,
       assinaturaBloq: assinaturaSegmentos(bloq),
     };
-    if (o.soLuzes) {
-      desenharLuzes(ctx, v.fontes, cl, o.cam, "escuro", o.dpr);
-    } else {
-      const camada = document.createElement("canvas");
-      camada.width = W;
-      camada.height = H;
-      const lctx = camada.getContext("2d")!;
-      desenharLuzes(lctx, v.fontes, cl, o.cam, o.tema, o.dpr);
-      ctx.save();
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      if (o.mapa) ctx.globalAlpha = 0.35;
-      ctx.globalCompositeOperation = o.tema === "escuro" ? "screen" : "multiply";
-      try {
-        ctx.filter = "blur(0.6px)";
-      } catch {
-        /* navegador sem filtro */
-      }
-      ctx.drawImage(camada, 0, 0);
-      ctx.filter = "none";
-      ctx.restore();
+    // camada de luz reaproveitada enquanto fontes, paredes, câmera e tamanho não mudam
+    const k = o.exportacao ? o.dpr : Math.min(o.dpr, 1.5);
+    const modo = o.soLuzes || o.tema === "claro" ? "alfa" : "tela";
+    const chave = `${cl.assinaturaBloq}|${o.cam.s}|${o.cam.ox}|${o.cam.oy}|${W}|${H}|${o.tema}|${o.vista}|${modo}|${k}`;
+    let camada: HTMLCanvasElement;
+    if (!o.exportacao && cacheCamada && cacheCamada.fontes === v.fontes && cacheCamada.chave === chave) camada = cacheCamada.canvas;
+    else {
+      camada = camadaDeLuz(v.fontes, cl, o.cam, o.largura, o.altura, o.tema, k, modo);
+      if (!o.exportacao) cacheCamada = { fontes: v.fontes, chave, canvas: camada };
     }
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    if (o.mapa) ctx.globalAlpha = 0.35;
+    ctx.globalCompositeOperation = o.soLuzes ? "source-over" : o.tema === "escuro" ? "screen" : "multiply";
+    if (!o.soLuzes) ctx.filter = "blur(0.6px)";
+    ctx.drawImage(camada, 0, 0, W, H);
+    ctx.filter = "none";
+    ctx.restore();
   }
   mundo();
 

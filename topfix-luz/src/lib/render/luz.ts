@@ -302,8 +302,8 @@ function desenharLinear(ctx: CanvasRenderingContext2D, f: Fonte, c: ContextoLuz)
   ge.addColorStop(1 - (ext + 0.05) / tot, "rgba(255,255,255,0.85)");
   ge.addColorStop(1, "rgba(255,255,255,0)");
   tctx.fillStyle = ge;
-  tctx.setTransform(1, 0, 0, 1, 0, 0);
-  tctx.fillRect(0, 0, tmp.width, tmp.height);
+  // o gradiente está em coordenadas do mundo: preenche um retângulo grande, também no mundo
+  tctx.fillRect(f.x - 100, f.y - 100, 200, 200);
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.drawImage(tmp, 0, 0);
@@ -363,12 +363,14 @@ export function desenharLuzes(
   cam: Camera,
   tema: "escuro" | "claro",
   dpr = 1,
+  ganho = 1,
 ) {
   const W = destino.canvas.width;
   const H = destino.canvas.height;
   destino.save();
   destino.setTransform(1, 0, 0, 1, 0, 0);
   destino.globalCompositeOperation = "lighter";
+  destino.globalAlpha = ganho;
   for (const f of fontes) {
     if (!f.visivel || f.intensidadePct <= 0) continue;
     const m = mascaraPintada(f, c, tema);
