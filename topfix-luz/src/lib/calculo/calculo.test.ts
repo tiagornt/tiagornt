@@ -196,3 +196,22 @@ describe("geometria", () => {
     for (const p of aDireita) expect(p.x).toBeLessThanOrEqual(1.0001);
   });
 });
+
+import { resultadoDaFonte } from "./fonte";
+
+describe("resultado de uma luminária", () => {
+  it("facho de 36° a 1,95 m do plano: mancha de 50% com Ø = 2 h tan(18°) e E no centro = I0 / h²", () => {
+    const f = fonte({ natureza: "facho", fluxo: 550, abertura: 36, altura: 2.7 });
+    const r = resultadoDaFonte(f, 0.75);
+    if (!r.ok) throw new Error(r.motivo);
+    expect(r.h).toBeCloseTo(1.95, 6);
+    expect(r.diametro50).toBeCloseTo(2 * 1.95 * Math.tan((18 * Math.PI) / 180), 1);
+    const I0 = 550 / anguloSolido((18 * Math.PI) / 180);
+    expect(r.Ecentro).toBeCloseTo(I0 / 1.95 ** 2, 3);
+  });
+
+  it("sem fluxo nem intensidade avisa em vez de inventar número", () => {
+    const r = resultadoDaFonte(fonte({ fluxo: null, intensidadeCd: null }), 0.75);
+    expect(r.ok).toBe(false);
+  });
+});

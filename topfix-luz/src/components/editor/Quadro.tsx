@@ -10,6 +10,7 @@ import { fmt } from "@/lib/calculo/lumens";
 import type { Ambiente, Natureza, Pt, Vista } from "@/lib/tipos";
 import { contornoAmbiente } from "@/lib/ambiente";
 import { DialogoCalibrar } from "./DialogoCalibrar";
+import { useResultadoFonte } from "./ResultadoLuminaria";
 
 type Arrasto =
   | { tipo: "pan"; x: number; y: number; cam: Camera }
@@ -54,6 +55,10 @@ export function Quadro() {
   const pedidoEnquadrar = useEditor((s) => s.pedidoEnquadrar);
   const amb = ambienteAtual({ projeto, ambienteId });
   const vista = amb ? vistaDe(amb, vistaNome) : null;
+
+  // fonte selecionada sozinha: projeção da mancha útil no plano (só na planta)
+  const fonteSel = vista && selecao.length === 1 && selecao[0].tipo === "fonte" ? vista.fontes.find((f) => f.id === selecao[0].id) ?? null : null;
+  const projecao = useResultadoFonte(vistaNome === "planta" ? fonteSel : null, amb, vistaNome, vista);
 
   // estado da interação
   const arrasto = useRef<Arrasto | null>(null);
@@ -210,6 +215,43 @@ export function Quadro() {
       ctx.setLineDash([]);
       if (ar.tipo === "retangulo")
         rotulo(ar.atual, `${fmt(Math.abs(ar.atual.x - ar.inicio.x), 2)} × ${fmt(Math.abs(ar.atual.y - ar.inicio.y), 2)} m`);
+    }
+    // projeção da luminária selecionada: mancha útil (50%) tracejada e alcance (10%) pontilhado
+    if (projecao && projecao.ok && fonteSel) {
+      const poli = (pts: Pt[], cor: string, traco: number[], larg: number) => {
+        ctx.strokeStyle = cor;
+        ctx.lineWidth = larg;
+        ctx.setLineDash(traco);
+        ctx.beginPath();
+        pts.forEach((p, i) => {
+          const P = T(p);
+          if (i) ctx.lineTo(P.x, P.y);
+          else ctx.moveTo(P.x, P.y);
+        });
+        ctx.closePath();
+        ctx.stroke();
+        ctx.setLineDash([]);
+      };
+      poli(projecao.contorno10, "rgba(86,199,245,0.45)", [2, 4], 1);
+      poli(projecao.contorno50, COR_SELECAO, [7, 4], 1.6);
+      const M = T(projecao.mira);
+      ctx.fillStyle = COR_SELECAO;
+      ctx.beginPath();
+      ctx.arc(M.x, M.y, 3, 0, Math.PI * 2);
+      ctx.fill();
+      const txt = `Ø ${fmt(projecao.diametro50, 2)} m · ${fmt(projecao.Ecentro)} lx no centro`;
+      ctx.font = '700 12px "Inter", system-ui, sans-serif';
+      const w = ctx.measureText(txt).width + 14;
+      const topo = Math.min(...projecao.contorno50.map((p) => T(p).y));
+      ctx.fillStyle = "rgba(10,14,24,0.88)";
+      ctx.beginPath();
+      ctx.roundRect(M.x - w / 2, topo - 28, w, 20, 5);
+      ctx.fill();
+      ctx.fillStyle = "#fff";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(txt, M.x, topo - 18);
+      ctx.textAlign = "left";
     }
     // medida feita
     if (medida) {

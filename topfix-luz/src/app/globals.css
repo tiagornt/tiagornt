@@ -27,6 +27,8 @@ body {
   scrollbar-color: rgba(150, 170, 210, 0.25) transparent;
 }
 
+/* Classes próprias numa camada: assim as utilidades do Tailwind (w-20, flex-1...) podem sobrescrever. */
+@layer components {
 .painel-lateral {
   background: var(--painel);
 }
@@ -284,4 +286,5 @@ input[type="checkbox"] {
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--marca);
+}
 }

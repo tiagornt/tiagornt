@@ -9,7 +9,7 @@ import { rgbDoCCT } from "../cor";
 import type { Camera } from "./camera";
 import { paraTela } from "./camera";
 import { assinaturaSegmentos, desenharLuzes, type ContextoLuz } from "./luz";
-import { bloqueadoresDaVista, contornoDasParedes, recuarPoligono } from "../geometria";
+import { bloqueadoresDaVista, contornoDasParedes, recuarPoligono, seg } from "../geometria";
 
 export type Tema = "escuro" | "claro";
 
@@ -301,7 +301,10 @@ export function desenharQuadro(ctx: CanvasRenderingContext2D, o: OpcoesQuadro) {
 
   // luzes
   if (o.camadas.croqui && v.fontes.length) {
-    const bloq = bloqueadoresDaVista(v);
+    // O contorno externo das paredes também bloqueia: luz de dentro não sai pela janela para fora da planta,
+    // e luz colocada fora do contorno continua aparecendo normalmente.
+    const lim = contornoDaVista(v);
+    const bloq = [...bloqueadoresDaVista(v), ...(lim ? lim.map((p, i) => seg(p, lim[(i + 1) % lim.length])) : [])];
     const cl: ContextoLuz = {
       vista: o.vista,
       peDireito: o.ambiente.peDireito,
@@ -328,15 +331,6 @@ export function desenharQuadro(ctx: CanvasRenderingContext2D, o: OpcoesQuadro) {
       if (!o.exportacao) cacheCamada = { fontes: v.fontes, chave, chaveBase, cam: { ...o.cam }, canvas: camada };
     }
     ctx.save();
-    // a luz fica dentro do contorno externo das paredes (não "vaza" pela janela para fora da planta)
-    const lim = contornoDaVista(v);
-    if (lim) {
-      mundo();
-      ctx.beginPath();
-      lim.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
-      ctx.closePath();
-      ctx.clip();
-    }
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     if (o.mapa) ctx.globalAlpha = 0.35;
     ctx.globalCompositeOperation = o.soLuzes ? "source-over" : o.tema === "escuro" ? "screen" : "multiply";

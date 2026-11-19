@@ -11,6 +11,7 @@ import { mudarVista, useEditor, useVista, useAmbiente } from "@/lib/store";
 import { NOME_NATUREZA, NATUREZAS, type Fonte, type Natureza, type Vista } from "@/lib/tipos";
 import { CampoNumero, Deslizante } from "../ui";
 import { LegendaPainel } from "./Legenda";
+import { ResultadoLuminaria } from "./ResultadoLuminaria";
 
 const GRADIENTE_CCT = `linear-gradient(90deg, ${[1800, 2700, 3000, 4000, 5000, 6500].map((k) => cssDoCCT(k)).join(", ")})`;
 
@@ -103,6 +104,7 @@ function mudarFonte(id: string, fn: (f: Fonte) => void, todasDoCodigo: boolean, 
 
 function PropFonte({ f, vista }: { f: Fonte; vista: Vista }) {
   const nomeVista = useEditor((s) => s.vista);
+  const amb = useAmbiente();
   const mesmas = vista.fontes.filter((x) => x.codigo === f.codigo).length;
   const todas = useEditor((s) => s.presetPorNatureza["__todas"] !== "nao");
   const juntas = todas && mesmas > 1;
@@ -134,6 +136,7 @@ function PropFonte({ f, vista }: { f: Fonte; vista: Vista }) {
         <span className="pilula">{Math.round(f.intensidadePct)} %</span>
         <span className="pilula">{fmt(nomeVista === "corte" ? f.y : f.altura, 2)} m</span>
       </div>
+      {amb && <ResultadoLuminaria f={f} amb={amb} vista={vista} />}
       {mesmas > 1 && (
         <label className="flex items-center gap-2 text-sm">
           <input
