@@ -30,6 +30,17 @@ export function Quadro() {
   const camRef = useRef<Camera>({ s: 60, ox: 200, oy: 500 });
   const [, forcar] = useState(0);
   const redesenhar = useCallback(() => forcar((n) => n + 1), []);
+  // câmera em movimento: o desenho usa a camada de luz guardada; ao parar, recalcula
+  const camMovendo = useRef(false);
+  const timerCam = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const moverCamera = useCallback(() => {
+    camMovendo.current = true;
+    if (timerCam.current) clearTimeout(timerCam.current);
+    timerCam.current = setTimeout(() => {
+      camMovendo.current = false;
+      forcar((n) => n + 1);
+    }, 140);
+  }, []);
 
   const projeto = useEditor((s) => s.projeto);
   const ambienteId = useEditor((s) => s.ambienteId);
@@ -139,6 +150,7 @@ export function Quadro() {
       mapa,
       grade: true,
       extrasPlanta: true,
+      rapido: camMovendo.current,
     });
     desenharPrevia(ctx, dpr);
   });
@@ -656,6 +668,7 @@ export function Quadro() {
       const c0 = pinca.current.cam;
       const k = d / pinca.current.d;
       mexeuNaCamera.current = true;
+      moverCamera();
       const s = Math.max(5, Math.min(2000, c0.s * k));
       const w = paraMundo(c0, pinca.current.cx, pinca.current.cy);
       camRef.current = { s, ox: cx - w.x * s, oy: cy + w.y * s };
@@ -675,6 +688,7 @@ export function Quadro() {
     }
     if (ar.tipo === "pan") {
       mexeuNaCamera.current = true;
+      moverCamera();
       camRef.current = { ...ar.cam, ox: ar.cam.ox + (sx - ar.x), oy: ar.cam.oy + (sy - ar.y) };
       redesenhar();
       return;
@@ -845,6 +859,7 @@ export function Quadro() {
 
   function aoRolar(e: React.WheelEvent) {
     mexeuNaCamera.current = true;
+    moverCamera();
     const { sx, sy } = pontoDoEvento(e);
     const cam = camRef.current;
     const k = Math.exp(-e.deltaY * 0.0015);

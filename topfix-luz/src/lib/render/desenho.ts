@@ -67,9 +67,11 @@ export interface OpcoesQuadro {
   extrasPlanta?: boolean;
   /** Desenho para exportação (não usa nem grava o cache da tela). */
   exportacao?: boolean;
+  /** Pan/zoom em andamento: reaproveita a camada de luz deslocada em vez de recalcular. */
+  rapido?: boolean;
 }
 
-let cacheCamada: { fontes: unknown; chave: string; canvas: HTMLCanvasElement } | null = null;
+let cacheCamada: { fontes: unknown; chave: string; chaveBase: string; cam: Camera; canvas: HTMLCanvasElement } | null = null;
 
 /** Ganho por fonte na soma (deixa folga antes de saturar os 8 bits). */
 const GANHO = 0.3;
@@ -310,12 +312,20 @@ export function desenharQuadro(ctx: CanvasRenderingContext2D, o: OpcoesQuadro) {
     // camada de luz reaproveitada enquanto fontes, paredes, câmera e tamanho não mudam
     const k = o.exportacao ? o.dpr : Math.min(o.dpr, 1.5);
     const modo = o.soLuzes || o.tema === "claro" ? "alfa" : "tela";
-    const chave = `${cl.assinaturaBloq}|${o.cam.s}|${o.cam.ox}|${o.cam.oy}|${W}|${H}|${o.tema}|${o.vista}|${modo}|${k}`;
+    const chaveBase = `${cl.assinaturaBloq}|${W}|${H}|${o.tema}|${o.vista}|${modo}|${k}`;
+    const chave = `${chaveBase}|${o.cam.s}|${o.cam.ox}|${o.cam.oy}`;
     let camada: HTMLCanvasElement;
+    // transformação da camada guardada para a câmera atual (durante pan/zoom rápido)
+    let ajuste: { k: number; dx: number; dy: number } | null = null;
     if (!o.exportacao && cacheCamada && cacheCamada.fontes === v.fontes && cacheCamada.chave === chave) camada = cacheCamada.canvas;
-    else {
+    else if (!o.exportacao && o.rapido && cacheCamada && cacheCamada.fontes === v.fontes && cacheCamada.chaveBase === chaveBase) {
+      camada = cacheCamada.canvas;
+      const c0 = cacheCamada.cam;
+      const kk = o.cam.s / c0.s;
+      ajuste = { k: kk, dx: (o.cam.ox - c0.ox * kk) * o.dpr, dy: (o.cam.oy - c0.oy * kk) * o.dpr };
+    } else {
       camada = camadaDeLuz(v.fontes, cl, o.cam, o.largura, o.altura, o.tema, k, modo);
-      if (!o.exportacao) cacheCamada = { fontes: v.fontes, chave, canvas: camada };
+      if (!o.exportacao) cacheCamada = { fontes: v.fontes, chave, chaveBase, cam: { ...o.cam }, canvas: camada };
     }
     ctx.save();
     // a luz fica dentro do contorno externo das paredes (não "vaza" pela janela para fora da planta)
@@ -331,7 +341,8 @@ export function desenharQuadro(ctx: CanvasRenderingContext2D, o: OpcoesQuadro) {
     if (o.mapa) ctx.globalAlpha = 0.35;
     ctx.globalCompositeOperation = o.soLuzes ? "source-over" : o.tema === "escuro" ? "screen" : "multiply";
     if (!o.soLuzes) ctx.filter = "blur(0.6px)";
-    ctx.drawImage(camada, 0, 0, W, H);
+    if (ajuste) ctx.drawImage(camada, ajuste.dx, ajuste.dy, W * ajuste.k, H * ajuste.k);
+    else ctx.drawImage(camada, 0, 0, W, H);
     ctx.filter = "none";
     ctx.restore();
   }
